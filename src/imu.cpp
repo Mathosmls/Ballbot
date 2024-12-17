@@ -125,8 +125,8 @@ unsigned long currentTime = millis(); // Temps actuel
     angleGyroY += gyroData.gyroY * dt; // Roulis
 
     // 4. Application du filtre complémentaire
-    filtered_pitch = alpha * (filtered_pitch + gyroData.gyroX * dt) + (1 - alpha) * angleAccX;
-    filtered_roll = alpha * (filtered_roll + gyroData.gyroY * dt) + (1 - alpha) * angleAccY;
+    filtered_pitch = alpha * (filtered_pitch + gyroData.gyroY * dt) + (1 - alpha) * angleAccY;
+    filtered_roll = alpha * (filtered_roll + gyroData.gyroX * dt) + (1 - alpha) * angleAccX;
   }
 }
 
