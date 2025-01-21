@@ -119,15 +119,15 @@ void loop() {
     // Serial.print("hhhhhhhhhhhhh");
     // updateEncoders();
     myIMU.update();
-    // computePID();
-    motor1.setSpeed(200);   // Motor 1 runs forward at 50% speed.
-    motor2.setSpeed(200);   // Motor 1 runs forward at 50% speed.
-    motor3.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    // // computePID();
+    // motor1.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    // motor2.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    // motor3.setSpeed(200);   // Motor 1 runs forward at 50% speed.
     Serial.println("boucle");
     // delay(10000);
-    if (i == 1) {
+    if (i == 50) {
         // printEncoderInfo();
-        // myIMU.printAll();
+        myIMU.printAll();
         myIMU.printAngle();
         // Serial.print("PID vx | vy: ");
         // Serial.print(vx);
@@ -139,87 +139,16 @@ void loop() {
     }
 }
 
-// /*******************************************************************************
-//  * THIS SOFTWARE IS PROVIDED IN AN "AS IS" CONDITION. NO WARRANTY AND SUPPORT
-//  * IS APPLICABLE TO THIS SOFTWARE IN ANY FORM. CYTRON TECHNOLOGIES SHALL NOT,
-//  * IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL OR CONSEQUENTIAL
-//  * DAMAGES, FOR ANY REASON WHATSOEVER.
-//  ********************************************************************************
-//  * DESCRIPTION:
-//  *
-//  * This example shows how to drive 2 motors using the PWM and DIR pins with
-//  * 2-channel motor driver.
-//  * 
-//  * 
-//  * CONNECTIONS:
-//  * 
-//  * Arduino D3  - Motor Driver PWM 1 Input
-//  * Arduino D4  - Motor Driver DIR 1 Input
-//  * Arduino D9  - Motor Driver PWM 2 Input
-//  * Arduino D10 - Motor Driver DIR 2 Input
-//  * Arduino GND - Motor Driver GND
-//  *
-//  *
-//  * AUTHOR   : Kong Wai Weng
-//  * COMPANY  : Cytron Technologies Sdn Bhd
-//  * WEBSITE  : www.cytron.io
-//  * EMAIL    : support@cytron.io
-//  *
-//  *******************************************************************************/
-
-// #include <SimpleFOC.h>
-// #include <PciManager.h>
-// #include <PciListenerImp.h>
-// #include "imu.hpp"
-// #include "pid.hpp"          
-// #include "CytronMotorDriver.h"
-
-// // Configure the motor driver.
-// CytronMD motor1(PWM_DIR, 10 ,12);  // PWM 1 = Pin 3, DIR 1 = Pin 4.
-// CytronMD motor2(PWM_DIR, 9, 8); // PWM 2 = Pin 9, DIR 2 = Pin 10.
-// CytronMD motor3(PWM_DIR, 11, 13); // PWM 2 = Pin 9, DIR 2 = Pin 10.
-
-// // The setup routine runs once when you press reset.
-// void setup() {
-//   Serial.begin(115200);
-// }
 
 
-// // The loop routine runs over and over again forever.
-// void loop() {
-//   motor1.setSpeed(50);   // Motor 1 runs forward at 50% speed.
-// //   motor2.setSpeed(-50);  // Motor 2 runs backward at 50% speed.
-// //   motor3.setSpeed(50);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("first");
-//   delay(5000);
-  
-//   motor1.setSpeed(100);   // Motor 1 runs forward at full speed.
-// //   motor2.setSpeed(-100);  // Motor 2 runs backward at full speed.
-// //   motor3.setSpeed(100);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("second");
-//   delay(5000);
 
-//   motor1.setSpeed(0);     // Motor 1 stops.
-// //   motor2.setSpeed(0);     // Motor 2 stops.
-// //   motor3.setSpeed(0);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("third");
-//   delay(5000);
 
-//   motor1.setSpeed(-50);  // Motor 1 runs backward at 50% speed.
-// //   motor2.setSpeed(50);   // Motor 2 runs forward at 50% speed.
-// //   motor3.setSpeed(50);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("fourth");
-//   delay(5000);
-  
-//   motor1.setSpeed(-100);  // Motor 1 runs backward at full speed.
-// //   motor2.setSpeed(100);   // Motor 2 runs forward at full speed.
-// //   motor3.setSpeed(100);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("fifth");
-//   delay(5000);
 
-//   motor1.setSpeed(0);     // Motor 1 stops.
-//   motor2.setSpeed(0);     // Motor 2 stops.
-//   motor3.setSpeed(0);  // Motor 2 runs backward at 50% speed.
-//   Serial.println("last");
-//   delay(5000);
-// }
+
+
+
+
+
+
+
+
