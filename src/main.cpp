@@ -10,9 +10,9 @@
 //---------------------------------
 const int NUM_ENCODERS = 3;
 Encoder encoders[NUM_ENCODERS] = {
-    Encoder(6, 7, 5000),
     Encoder(2, 3, 5000),
-    Encoder(4, 5, 5000)
+    Encoder(18, 19, 5000),
+    Encoder(20, 21, 5000)
 };
 
 void doA0() { encoders[0].handleA(); }
@@ -84,7 +84,7 @@ CytronMD motor3(PWM_DIR, 11, 13); // PWM 2 = Pin 9, DIR 2 = Pin 10.
 
 void setup() {
     Serial.begin(115200);
-
+    Serial.println("Setup");
 //---------------------------------
 //ENCODEURS
 //---------------------------------
@@ -92,43 +92,47 @@ void setup() {
         encoders[i].quadrature = Quadrature::ON;
         encoders[i].pullup = Pullup::USE_EXTERN;
         encoders[i].init();
-
+        encoders[i].enableInterrupts(doA[i], doB[i]);
         // Associer les interruptions via PciListeners
-        listenersA[i] = new PciListenerImp(encoders[i].pinA, doA[i]);
-        listenersB[i] = new PciListenerImp(encoders[i].pinB, doB[i]);
-        PciManager.registerListener(listenersA[i]);
-        PciManager.registerListener(listenersB[i]);
+        // listenersA[i] = new PciListenerImp(encoders[i].pinA, doA[i]);
+        // listenersB[i] = new PciListenerImp(encoders[i].pinB, doB[i]);
+        // PciManager.registerListener(listenersA[i]);
+        // PciManager.registerListener(listenersB[i]);
     }
     Serial.println("Encoders ready");
 //----------------------------------------
 //IMU
 //----------------------------------------
-    if (!myIMU.init()) {
-            Serial.println("Échec de l'initialisation de l'IMU.");
-        }
+    // if (!myIMU.init()) {
+    //         Serial.println("Échec de l'initialisation de l'IMU.");
+    //     }
+    // else 
+    // {
+    //     Serial.println("IMU ready");
+    // }
 
-        myIMU.calibrate();
+        // myIMU.calibrate();
 }
 
 void loop() {
     static int i = 0;
     // Serial.print("hhhhhhhhhhhhh");
-    updateEncoders();
+    // updateEncoders();
     myIMU.update();
-    computePID();
-    motor1.setSpeed(50);   // Motor 1 runs forward at 50% speed.
-    motor2.setSpeed(50);   // Motor 1 runs forward at 50% speed.
-    motor3.setSpeed(50);   // Motor 1 runs forward at 50% speed.
-    Serial.println("ioesfbisno");
+    // computePID();
+    motor1.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    motor2.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    motor3.setSpeed(200);   // Motor 1 runs forward at 50% speed.
+    Serial.println("boucle");
     // delay(10000);
     if (i == 1) {
         // printEncoderInfo();
         // myIMU.printAll();
         myIMU.printAngle();
-        Serial.print("PID vx | vy: ");
-        Serial.print(vx);
-        Serial.print("\t");
-        Serial.println(vy);
+        // Serial.print("PID vx | vy: ");
+        // Serial.print(vx);
+        // Serial.print("\t");
+        // Serial.println(vy);
         i = 0;
     } else {
         i++;
