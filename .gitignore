@@ -4,3 +4,6 @@
 **/.vscode/c_cpp_properties.json
 **/.vscode/launch.json
 **/.vscode/ipch
+/Sim_2D
+/Siulation_LQR
+lib_IMU9050.zip

@@ -4,7 +4,9 @@
 #include <SimpleFOC.h>
 #include <Arduino.h>
 #include <math.h>
-
+#include <vector>
+#include <algorithm>  // Pour std::clamp
+using namespace std;
 //----------------------------------------
 
 #pragma region "IMU"
@@ -17,13 +19,16 @@ IMU myIMU(1000,4);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 
-double Kp_pitch = 1700.0, Ki_pitch = 0.0, Kd_pitch = 100.0;
-double Kp_roll = 1700.0, Ki_roll = 0.0, Kd_roll = 100.0;
+// double Kp_pitch = 1700.0, Ki_pitch = 0.0, Kd_pitch = 100.0;
+// double Kp_roll = 1700.0, Ki_roll = 0.0, Kd_roll = 100.0;
+double Kp_pitch = 67.0, Ki_pitch = 0.0, Kd_pitch = 3.;
+double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
 double setpoint_pitch = 0.;        // Angle cible calculé par la boucle externe
 double setpoint_roll = 0.;        // Angle cible calculé par la boucle externe
 double roll, pitch, vx, vy; // Entrée et sortie de la boucle interne
 MyPID pid_pitch(Kp_pitch, Ki_pitch, Kd_pitch, &pitch, &vx, &setpoint_pitch);
 MyPID pid_roll(Kp_roll, Ki_roll, Kd_roll, &roll, &vy, &setpoint_roll);
+
 double pi = 3.14159265358979;
 
 // Voir fonction compute_PID()
@@ -48,13 +53,22 @@ void fuzzy() {
 CytronMD motor1(PWM_DIR, 12, 10);  // PWM 1 = Pin 12, DIR 1 = Pin 10.
 CytronMD motor2(PWM_DIR, 7, 11); // PWM 2 = Pin 8, DIR 2 = Pin 9.
 CytronMD motor3(PWM_DIR, 8, 9); // PWM 3 = Pin 7, DIR 3 = Pin 11.
-
+vector<CytronMD> motors ={motor1,motor2,motor3};
 double motor1_speed, motor2_speed, motor3_speed;
 
 double get_motor_speed(int numero, double vx, double vy) {
   double angle = (1 - numero)*(2./3.)*pi + pi;
   double v_motor = vx*sin(angle) + vy*cos(angle);
   return constrain(v_motor, -255, 255);
+}
+
+void set_setpoints(vector<double> &set, double vx, double vy) {
+  for (int i=0;i<set.size();i++)
+  {
+    double angle = (1 - (i+1))*(2./3.)*pi + pi;
+    double v_motor = vx*sin(angle) + vy*cos(angle);
+    set[i]=constrain(v_motor, -8., 8.);
+  }
 }
 
 #pragma endregion
@@ -65,8 +79,8 @@ double get_motor_speed(int numero, double vx, double vy) {
 
 const int NUM_ENCODERS = 3;
 Encoder encoders[NUM_ENCODERS] = {
-    Encoder(2, 3, 192),
-    Encoder(5, 6, 192),
+    Encoder(2, 3, 500),
+    Encoder(5, 6, 500),
     Encoder(30, 31, 192)};
 
 // Fonctions d'interruption pour chaque encodeur
@@ -144,29 +158,30 @@ void print_data() {
     Serial.println("==================================================");
 }
 
-void computePID() {
+void computePID(vector<double> &set) {
   pitch = myIMU.get_pitch_rad();
   roll = myIMU.get_roll_rad();
   pid_pitch.Compute();
   pid_roll.Compute();
+  set_setpoints(set, vx, vy);
 
-  // motor1_speed = get_motor_speed(1, vx, vy);
-  // motor2_speed = get_motor_speed(2, vx, vy);
-  // motor3_speed = get_motor_speed(3, vx, vy);
+}
 
-  motor1_speed = 0;
-  motor2_speed = 0;
-  motor3_speed = 100;
+void set_speed_motors(vector<MyPID> pids_wheels) {
+  for (int i =0;i<pids_wheels.size();i++)
+  {
+    pids_wheels[i].Compute();
 
-  odo1 = encoders[0].getVelocity();
-  odo2 = encoders[1].getVelocity();
-  odo3 = encoders[2].getVelocity();
-  setpoint_odo1 = (-16./255.)*motor1_speed;
-  setpoint_odo2 = (-16./255.)*motor2_speed;
-  setpoint_odo3 = (-16./255.)*motor3_speed;
-  pid_odo1.Compute();
-  pid_odo2.Compute();
-  pid_odo3.Compute();
+  }
+}
+
+void get_speed_motors(vector<double> &last_pos, vector<double> &speeds, double dt)
+{
+  //return speed in rad/s
+  for (int j = 0; j < size(encoders); j++) {
+    speeds[j]=(last_pos[j] -encoders[j].getAngle())/(dt/1000);
+    last_pos[j]=encoders[j].getAngle();
+  }
 }
 
 void setup() {
@@ -188,49 +203,92 @@ void setup() {
     }
 }
 
-// void loop() {
-//     static int i = 0;
+vector<double> cmd_motors={0.,0.,0.};
+vector<double> setpoints={5,5,5};
+vector<double> prev_cmd_motors={0.,0.,0.};
+vector<double> speed_motors={0.,0.,0.};
+vector<double> last_pos_motors={0.,0.,0.};
+unsigned long previousTime = 0;
+double interval = 10.; // dt en millisecondes (100 ms = 0.1s)
 
-//     myIMU.update();
-//     updateEncoders();
-//     fuzzy();
-//     computePID();
+// double Kp_wheel= 2.2, Ki_wheel= 0.0, Kd_wheel= 4.0;
+// double Kp_wheel= 3., Ki_wheel= 0.0, Kd_wheel= 8.0;
 
-//     motor1.setSpeed(motor1_speed - correction_odo1);
-//     motor2.setSpeed(motor2_speed - correction_odo2);
-//     motor3.setSpeed(motor3_speed - correction_odo3);
-
-//     if (i == 2500) {
-//         print_data();
-//         i = 0;
-//     } else {
-//         i++;
-//     }
-// }
+double Kp_wheel= 3.5, Ki_wheel= 0.0, Kd_wheel= 20.0;
+// double Kp_wheel= 2.5, Ki_wheel= 0.0, Kd_wheel= 10.0;
+MyPID pid_wheel1(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[0], &cmd_motors[0], &setpoints[0]);
+MyPID pid_wheel2(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[1], &cmd_motors[1], &setpoints[1]);
+MyPID pid_wheel3(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[2], &cmd_motors[2], &setpoints[2]);
+vector<MyPID> pids_wheels = {pid_wheel1,pid_wheel2,pid_wheel3};
 
 void loop() {
     static int i = 0;
-
+    static int j = 0;
     myIMU.update();
     updateEncoders();
-    // fuzzy();
-    computePID();
+    // // fuzzy();
+    computePID(setpoints);
 
-    motor1.setSpeed(motor1_speed); // - correction_odo1);
-    motor2.setSpeed(motor2_speed); // - correction_odo2);
-    motor3.setSpeed(motor3_speed); // - correction_odo3);
+    unsigned long currentTime = millis();
+    if (currentTime - previousTime >= interval) {
+        Serial.print(">dt:");
+        Serial.println(currentTime - previousTime);
+        previousTime = currentTime;
+        get_speed_motors(last_pos_motors,speed_motors,interval);
+        set_speed_motors(pids_wheels);
+        for (int i=0;i<motors.size();i++)
+        {
+          double cmd=(prev_cmd_motors[i]+cmd_motors[i]);
+          cmd= clamp(cmd, -255., 255.);
+          // Serial.println(cmd);
+          motors[i].setSpeed(cmd);
+          prev_cmd_motors[i]=cmd;
+        }
+        Serial.print(">cmd:");
+        Serial.println(setpoints[0]);
+        Serial.print(">speed:");
+        Serial.println(speed_motors[0]);
+        // j++;
+        // if (j>0.3/(interval/1000))
+        // {
+        //   if (setpoints[2]<9)
+        //   setpoints[2]+=5;
+        //   else 
+        //   setpoints[2]-=10;
+        //   j=0;
+        // }
+    }
+
     
-    if (i == 2000) {
-        printEncoderInfo();
-        Serial.println("==================================================");
-        Serial.println("Corrections odomètres : ");
-        Serial.print("c1 = ");
-        Serial.println(correction_odo1);
-        Serial.print("c2 = ");
-        Serial.println(correction_odo2);
-        Serial.print("c3 = ");
-        Serial.println(correction_odo3);
-        Serial.println("==================================================");
+    
+    // // motor1_speed = 50;
+    // // motor2_speed = 50;
+    // // motor3_speed = 100;
+    
+    // motor1.setSpeed(motor1_speed); // - correction_odo1);
+    // motor2.setSpeed(motor2_speed); // - correction_odo2);
+    // motor3.setSpeed(motor3_speed); // - correction_odo3);
+    
+    if (i == 100) {
+        // printEncoderInfo();
+        String output = "cal Speeds: " + String(speed_motors[0]) + " "+ String(speed_motors[1]) + " " + String(speed_motors[2]);   
+        Serial.println(output);   
+        output = "set Speeds: " + String(setpoints[0]) + " "+ String(setpoints[1]) + " " + String(setpoints[2]);   
+        Serial.println(output);  
+        output = "cmd motors: " + String(cmd_motors[0]) + " "+ String(cmd_motors[1]) + " " + String(cmd_motors[2]);   
+        Serial.println(output);
+        myIMU.printAngle();
+        // output = "enc Speeds: " + String(encoders[0].getVelocity()) + " "+ String(encoders[1].getVelocity()) + " " + String(encoders[2].getVelocity());   
+        // Serial.println(output); 
+        // Serial.println("==================================================");
+        // Serial.println("Corrections odomètres : ");
+        // Serial.print("c1 = ");
+        // Serial.println(correction_odo1);
+        // Serial.print("c2 = ");
+        // Serial.println(correction_odo2);
+        // Serial.print("c3 = ");
+        // Serial.println(correction_odo3);
+        // Serial.println("==================================================");
         i = 0;
     } else {
         i++;

@@ -1,12 +1,20 @@
 #include <Arduino.h>
 #include <SimpleFOC.h>
+#include "CytronMotorDriver.h"
+
+
+// Configure the motor driver.
+CytronMD motor1(PWM_DIR, 12 ,10);  // PWM 1 = Pin 12, DIR 1 = Pin 10.
+CytronMD motor3(PWM_DIR, 8, 9); // PWM 2 = Pin 8, DIR 2 = Pin 9.
+CytronMD motor2(PWM_DIR, 7, 11); // PWM 2 = Pin 7, DIR 2 = Pin 11.
+
 
 
 const int NUM_ENCODERS = 3;
 Encoder encoders[NUM_ENCODERS] = {
     Encoder(2, 3, 500),
     Encoder(5, 6, 500),
-    Encoder(30, 31, 500)};
+    Encoder(30, 31, 192)};
 
 // Fonctions d'interruption pour chaque encodeur
 void doA0() { encoders[0].handleA(); }
@@ -61,6 +69,9 @@ void setup()
 
 void loop()
 {
+  motor1.setSpeed(0);   // -225 to 255.
+  motor2.setSpeed(50);  
+  motor3.setSpeed(100); 
   static int i = 0;
   updateEncoders();
   if (i == 50)
