@@ -17,10 +17,10 @@ private:
     int _gyro_range;
     int _acc_range;
     unsigned long lastUpdateTime = 0; 
-    float dt =0.01;
+    float dt =0.001;
     float filtered_pitch;
     float filtered_roll;
-    float alpha =0.98;
+    float alpha =0.984;
     float angleGyroX;
     float angleGyroY;
 

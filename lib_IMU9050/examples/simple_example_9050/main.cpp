@@ -1,6 +1,5 @@
 #include "imu.hpp"
 #include <Arduino.h>
-//----------------------------------------
 //IMU
 //----------------------------------------
 
@@ -29,6 +28,10 @@ void loop() {
     // Serial.println("boucle");
     if (i == 100) {
         myIMU.printAll();
+        Serial.print(">roll:");
+        Serial.println(myIMU.get_roll_deg());
+        Serial.print(">pitch:");
+        Serial.println(myIMU.get_pitch_deg());
         // myIMU.printAngle();
         i = 0;
     } else {
