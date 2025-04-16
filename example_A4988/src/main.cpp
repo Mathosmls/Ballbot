@@ -16,12 +16,12 @@ const byte dirPinZ = 7;
 
 const byte enablePin = 8;
 
-int cmd_speed=1000;
+int cmd_speed=2000;
 int cmd_speed2=500;
 unsigned long acceleration=80000; 
 // Pour le changement de direction
 unsigned long previousMillis = 0;
-const unsigned long interval = 5000; // 5 secondes
+const unsigned long interval = 500000; // 5 secondes
 
 
 void setup() {

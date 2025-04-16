@@ -21,7 +21,7 @@ private:
     float dt =0.001;
     float filtered_pitch;
     float filtered_roll;
-    float alpha =0.984;
+    float alpha =0.991;
     float angleGyroX;
     float angleGyroY;
 

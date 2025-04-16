@@ -1,47 +1,38 @@
 #include "imu.hpp"
-#include "pid.hpp"          
-#include "CytronMotorDriver.h"
-#include <SimpleFOC.h>
+#include "pid.hpp"
 #include <Arduino.h>
 #include <math.h>
-#include <vector>
-#include <algorithm>  // Pour std::clamp
 using namespace std;
 //----------------------------------------
 
+template <typename T>
+T clamp(T val, T min_val, T max_val)
+{
+  if (val < min_val)
+    return min_val;
+  if (val > max_val)
+    return max_val;
+  return val;
+}
+
 #pragma region "IMU"
 
-IMU myIMU(1000,4);
+IMU myIMU(500, 2);
 
 #pragma endregion
 
 //----------------------------------------
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
-
-// double Kp_pitch = 1700.0, Ki_pitch = 0.0, Kd_pitch = 100.0;
-// double Kp_roll = 1700.0, Ki_roll = 0.0, Kd_roll = 100.0;
-double Kp_pitch = 67.0, Ki_pitch = 0.0, Kd_pitch = 3.;
+// double Kp_pitch = 137.0, Ki_pitch = 0.6, Kd_pitch =1.4;
+double Kp_pitch = 139.0, Ki_pitch = 0.5, Kd_pitch =1.4;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
-double setpoint_pitch = 0.;        // Angle cible calculé par la boucle externe
-double setpoint_roll = 0.;        // Angle cible calculé par la boucle externe
+double setpoint_pitch = radians(0.5); // Angle cible calculé par la boucle externe
+double setpoint_roll = radians(0.8);  // Angle cible calculé par la boucle externe
 double roll, pitch, vx, vy; // Entrée et sortie de la boucle interne
 MyPID pid_pitch(Kp_pitch, Ki_pitch, Kd_pitch, &pitch, &vx, &setpoint_pitch);
 MyPID pid_roll(Kp_roll, Ki_roll, Kd_roll, &roll, &vy, &setpoint_roll);
-
-double pi = 3.14159265358979;
-
-
-//PID pour la vitesse des roues
-// double Kp_wheel= 2.2, Ki_wheel= 0.0, Kd_wheel= 4.0;
-// double Kp_wheel= 3., Ki_wheel= 0.0, Kd_wheel= 8.0;
-
-double Kp_wheel= 3.5, Ki_wheel= 0.0, Kd_wheel= 20.0;
-// double Kp_wheel= 2.5, Ki_wheel= 0.0, Kd_wheel= 10.0;
-MyPID pid_wheel1(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[0], &cmd_motors[0], &setpoints[0]);
-MyPID pid_wheel2(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[1], &cmd_motors[1], &setpoints[1]);
-MyPID pid_wheel3(Kp_wheel, Ki_wheel, Kd_wheel, &speed_motors[2], &cmd_motors[2], &setpoints[2]);
-vector<MyPID> pids_wheels = {pid_wheel1,pid_wheel2,pid_wheel3};
+double offset_roll,offset_pitch;
 
 #pragma endregion
 
@@ -49,181 +40,178 @@ vector<MyPID> pids_wheels = {pid_wheel1,pid_wheel2,pid_wheel3};
 
 #pragma region "Moteurs"
 
-CytronMD motor1(PWM_DIR, 12, 10);  // PWM 1 = Pin 12, DIR 1 = Pin 10.
-CytronMD motor2(PWM_DIR, 7, 11); // PWM 2 = Pin 8, DIR 2 = Pin 9.
-CytronMD motor3(PWM_DIR, 8, 9); // PWM 3 = Pin 7, DIR 3 = Pin 11.
-vector<CytronMD> motors ={motor1,motor2,motor3};
-
-double get_motor_speed(int numero, double vx, double vy) {
-  double angle = (1 - numero)*(2./3.)*pi + pi;
-  double v_motor = vx*sin(angle) + vy*cos(angle);
-  return constrain(v_motor, -255, 255);
-}
-
-void set_setpoints(vector<double> &set, double vx, double vy) {
-  for (int i=0;i<set.size();i++)
-  {
-    double angle = (1 - (i+1))*(2./3.)*pi + pi;
-    double v_motor = vx*sin(angle) + vy*cos(angle);
-    set[i]=constrain(v_motor, -8., 8.);
-  }
-}
-
-void set_speed_motors(vector<MyPID> pids_wheels) {
-  for (int i =0;i<pids_wheels.size();i++)
-  {
-    pids_wheels[i].Compute();
-
-  }
-}
-
-void get_speed_motors(vector<double> &last_pos, vector<double> &speeds, double dt)
+void cmd_rot_speeds(double (&cmd_rad)[3], double vx, double vy)
 {
-  //return speed in rad/s
-  for (int j = 0; j < size(encoders); j++) {
-    speeds[j]=(last_pos[j] -encoders[j].getAngle())/(dt/1000);
-    last_pos[j]=encoders[j].getAngle();
+  for (int i = 0; i < 3; i++)
+  {
+    double angle = (1 - (i + 1)) * (2. / 3.) * M_PI + M_PI;
+    double v_motor = -(vx * sin(angle) + vy * cos(angle));
+    cmd_rad[i] = constrain(v_motor, -10., 10.);
   }
 }
+
+void set_motors_speed(double (&cmd_rad)[3], int (&cmd_mot)[3], int maxi)
+{
+  for (int i = 0; i < 3; i++)
+  {
+    int cmd_step_mot = int(float(cmd_rad[i]) / (2. * M_PI) * 200. * 10.*4.); // rad/s->tr/s->tick/s->etage de reduction->microstep
+    cmd_step_mot = constrain(cmd_step_mot, -maxi, maxi);
+    cmd_mot[i] = cmd_step_mot;
+  }
+}
+
+void print_cmd_speed(double cmd_speed[3])
+{
+  for (int i = 0; i < 3; i++)
+  {
+    String output = ">cmd speed motor " + String(i + 1) + " : ";
+    Serial.print(output);
+    Serial.println(cmd_speed[i]);
+  }
+}
+
+void print_cmd_motors(int cmd_mot[3])
+{
+  for (int i = 0; i < 3; i++)
+  {
+    String output = ">cmd tick motor " + String(i + 1) + " : ";
+    Serial.print(output);
+    Serial.println(cmd_mot[i]);
+  }
+}
+
+void send_cmd_mot(byte (&buf)[7],const int (&cmd_mot)[3])
+{
+  buf[0] = 0x01;  // Byte de démarrage
+
+  // Convertir chaque entier cmd_mot[i] en 2 octets (big endian)
+  buf[1] = (cmd_mot[0] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[0]
+  buf[2] = cmd_mot[0] & 0xFF;         // Octet de poids faible de cmd_mot[0]
+
+  buf[3] = (cmd_mot[1] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[1]
+  buf[4] = cmd_mot[1] & 0xFF;         // Octet de poids faible de cmd_mot[1]
+
+  buf[5] = (cmd_mot[2] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[2]
+  buf[6] = cmd_mot[2] & 0xFF;         // Octet de poids faible de cmd_mot[2]
+
+  // Envoyer le tableau buf avec les 7 octets
+  Serial1.write(buf, sizeof(buf));
+}
+
 
 #pragma endregion
 
 //----------------------------------------
-
-#pragma region "Encodeurs + contrôle de la vitesse de rotation en boucle fermée"
-
-const int NUM_ENCODERS = 3;
-Encoder encoders[NUM_ENCODERS] = {
-    Encoder(2, 3, 500),
-    Encoder(5, 6, 500),
-    Encoder(30, 31, 192)};
-
-// Fonctions d'interruption pour chaque encodeur
-void doA0() { encoders[0].handleA(); }
-void doB0() { encoders[0].handleB(); }
-void doA1() { encoders[1].handleA(); }
-void doB1() { encoders[1].handleB(); }
-void doA2() { encoders[2].handleA(); }
-void doB2() { encoders[2].handleB(); }
-
-// Tableau de pointeurs vers les fonctions d'interruption
-void (*doA[NUM_ENCODERS])() = {doA0, doA1, doA2};
-void (*doB[NUM_ENCODERS])() = {doB0, doB1, doB2};
-
-void updateEncoders() {
-  for (int j = 0; j < NUM_ENCODERS; j++) {
-    encoders[j].update(); // Met à jour les données de l'encodeur
-  }
-}
-
-void printEncoderInfo() {
-  for (int j = 0; j < NUM_ENCODERS; j++) {
-    Serial.print("enc ");
-    Serial.print(j + 1);
-    Serial.print(" : ");
-    Serial.print(encoders[j].getAngle());
-    Serial.print("\t");
-    Serial.println(encoders[j].getVelocity());
-  }
-}
-
-double Kp_odo = 3.0, Ki_odo = 0.0, Kd_odo = 0.0;
-double setpoint_odo1, setpoint_odo2, setpoint_odo3;
-double odo1, odo2, odo3;
-double correction_odo1, correction_odo2, correction_odo3;
-MyPID pid_odo1(Kp_odo, Ki_odo, Kd_odo, &odo1, &correction_odo1, &setpoint_odo1);
-MyPID pid_odo2(Kp_odo, Ki_odo, Kd_odo, &odo2, &correction_odo2, &setpoint_odo2);
-MyPID pid_odo3(Kp_odo, Ki_odo, Kd_odo, &odo3, &correction_odo3, &setpoint_odo3);
-
-#pragma endregion
-
-
-//----------------------------------------
-//Core program
+// Core program
 //----------------------------------------
 
-void computePID(vector<double> &set) {
-  pitch = myIMU.get_pitch_rad();
-  roll = myIMU.get_roll_rad();
+void computePID(double (&cmd_rad)[3], double &pitch_b, double &roll_b, int &i_b )
+{
+  pitch = pitch_b/i_b-offset_pitch;
+  roll =roll_b/i_b-offset_roll;
+  i_b=0;
+  roll_b=0.;
+  pitch_b=0.;
   pid_pitch.Compute();
   pid_roll.Compute();
-  set_setpoints(set, vx, vy);
-
+  cmd_rot_speeds(cmd_rad, vx, vy);
 }
 
+void setup()
+{
+  Serial.begin(230400);
+  Serial1.begin(230400);
 
-
-void setup() {
-    Serial.begin(115200);
-
-    if (!myIMU.init()) {
-        Serial.println("Échec de l'initialisation de l'IMU.");
-    }
-    myIMU.calibrate();
-
-    for (int i = 0; i < NUM_ENCODERS; i++) {
-        encoders[i].quadrature = Quadrature::ON;
-        encoders[i].pullup = Pullup::USE_EXTERN;
-        encoders[i].init();
-
-        // Attacher les interruptions matérielles
-        attachInterrupt(digitalPinToInterrupt(encoders[i].pinA), doA[i], CHANGE);
-        attachInterrupt(digitalPinToInterrupt(encoders[i].pinB), doB[i], CHANGE);
-    }
+  if (!myIMU.init())
+  {
+    // Serial.println("Échec de l'initialisation de l'IMU.");
+  }
+  myIMU.calibrate();
+  Serial.println("end setup");
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH);
 }
 
-vector<double> cmd_motors={0.,0.,0.}; //cmd actuelle de la vitesse de chaque moteur (pwm -255 à 255), géré dans le PID
-vector<double> setpoints={5,5,5}; //vitesse visée pour chaque moteur 
-vector<double> prev_cmd_motors={0.,0.,0.}; 
-vector<double> speed_motors={0.,0.,0.}; //vitesse mesurée des moteurs
-vector<double> last_pos_motors={0.,0.,0.}; //dernière position des moterus, utilisés pour calculer la vitesse
+double cmd_speed_rad[3] = {4, 4, 4}; // vitesse visée pour chaque moteur
+int cmd_motors[3] = {0, 0, 0};       // vitesse visée pour chaque moteur
+
 unsigned long previousTime = 0;
-double interval = 10.; // dt en millisecondes (10 ms = 0.01s). Permet de régler la fréquence de lecture des odomètres et de l'envoie de la commande
+const unsigned long interval = 1./200.*1000000.0; // 5000 µs = 5 ms → 200 Hz
+byte buffer_cmd_mot[7];
+double roll_buff=0;
+double pitch_buff=0;
+int i_buff=0;
+void loop()
+{
+  static unsigned long lastTime = 0;
 
-
-void loop() {
-    static int i = 0;
-    static int j = 0;
-    myIMU.update();
-    updateEncoders();
-    computePID(setpoints);
-
-    unsigned long currentTime = millis();
-    if (currentTime - previousTime >= interval) {
-        Serial.print(">dt:");
-        Serial.println(currentTime - previousTime);
-        previousTime = currentTime;
-        get_speed_motors(last_pos_motors,speed_motors,interval);
-        set_speed_motors(pids_wheels);
-        for (int i=0;i<motors.size();i++)
-        {
-          double cmd=(prev_cmd_motors[i]+cmd_motors[i]);
-          cmd= clamp(cmd, -255., 255.);
-          motors[i].setSpeed(cmd);
-          prev_cmd_motors[i]=cmd;
-        }
-        Serial.print(">cmd:");
-        Serial.println(setpoints[0]);
-        Serial.print(">speed:");
-        Serial.println(speed_motors[0]);
-        
-    }
-
-    
-    
+  unsigned long now = micros();
+  myIMU.update_all();
   
-    
-    if (i == 100) {
-        String output = "cal Speeds: " + String(speed_motors[0]) + " "+ String(speed_motors[1]) + " " + String(speed_motors[2]);   
-        Serial.println(output);   
-        output = "set Speeds: " + String(setpoints[0]) + " "+ String(setpoints[1]) + " " + String(setpoints[2]);   
-        Serial.println(output);  
-        output = "cmd motors: " + String(cmd_motors[0]) + " "+ String(cmd_motors[1]) + " " + String(cmd_motors[2]);   
-        Serial.println(output);
-        myIMU.printAngle();
+  roll_buff+=myIMU.get_roll_rad();
+  pitch_buff+=myIMU.get_pitch_rad();
+  i_buff++;
+  if (now - lastTime >= interval)
+  {
+    lastTime = now;
 
-        i = 0;
-    } else {
-        i++;
+    static int i = 0;
+    unsigned long t0 = micros();
+
+    
+    computePID(cmd_speed_rad,pitch_buff,roll_buff,i_buff);
+    set_motors_speed(cmd_speed_rad, cmd_motors, 12000);
+    // cmd_motors[0]=2000+i; 
+    // cmd_motors[1]=2000+i; 
+    // cmd_motors[2]=2000+i;  
+    send_cmd_mot(buffer_cmd_mot,cmd_motors);
+
+
+    if (i ==1)
+    {
+      // print_cmd_speed(cmd_speed_rad);
+      // print_cmd_motors(cmd_motors);
+      // myIMU.printAngle();
+      Serial.print(">roll:");
+      Serial.println(myIMU.get_roll_deg());
+      Serial.print(">pitch:");
+      Serial.println(myIMU.get_pitch_deg());
+      // Serial.println(interval);
+
+      // Serial.print(">roll_kalman:");
+      // Serial.println(myIMU.get_kalman_roll_deg());
+      // Serial.print(">pitch_kalman:");
+      // Serial.println(myIMU.get_kalman_pitch_deg());
+
+
+      // Serial.print(">roll_madgwick:");
+      // Serial.println(myIMU.get_madgwick_roll_deg());
+      // Serial.print(">pitch_madgwick:");
+      // Serial.println(myIMU.get_madgwick_pitch_deg());
+
+      // Serial.print(">accX:");
+      // Serial.println(myIMU.accelData.accelX);
+      // Serial.print(">accY:");
+      // Serial.println(myIMU.accelData.accelY);
+      // Serial.print(">accZ:");
+      // Serial.println(myIMU.accelData.accelZ);
+  
+      // Serial.print(">gyroX:");
+      // Serial.println(myIMU.gyroData.gyroX);
+      // Serial.print(">gyroY:");
+      // Serial.println(myIMU.gyroData.gyroY);
+      // Serial.print(">gyroZ:");
+      // Serial.println(myIMU.gyroData.gyroZ);
+
+      i = 0;
     }
+    else
+    {
+      i++;
+    }
+    unsigned long t1 = micros();
+  Serial.print("IMU update took: ");
+  Serial.println(t1 - now);
+  Serial.println(" us");
+  }
 }

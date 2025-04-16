@@ -3,11 +3,11 @@
 
 // Constructeur pour initialiser les gains et la direction du MyPID
 MyPID::MyPID(double Kp, double Ki, double Kd, double *input, double *output, double *setpoint)
-    : Kp(Kp), Ki(Ki), Kd(Kd), input(input), output(output), setpoint(setpoint), lastError(0.0), integral(0.0), sampleTime(100) {
-    lastTime = millis();
+    : Kp(Kp), Ki(Ki), Kd(Kd), input(input), output(output), setpoint(setpoint), lastError(0.0), integral(0.0), sampleTime(5000) {
+    lastTime = micros();
 }
 
-// Fonction pour configurer l'intervalle de calcul du MyPID (en ms)
+// Fonction pour configurer l'intervalle de calcul du MyPID (en us)
 void MyPID::SetSampleTime(unsigned long time) {
     sampleTime = time;
 }
@@ -42,16 +42,22 @@ double MyPID::Get_derivative() {
 
 // Fonction pour calculer la sortie MyPID
 void MyPID::Compute() {
-    unsigned long currentTime = millis();
+    unsigned long currentTime = micros();
     unsigned long timeChange = currentTime - lastTime;
 
     if (timeChange >= sampleTime) {
         // Calcul de l'erreur
         double error = *setpoint - *input;
+        // if (abs(error)<radians(0.5))
+        // {
+        //     error=0.;
+        // }
 
         // Calcul de l'intégrale et de la dérivée
-        integral += error * (timeChange / 1000.0);
-        derivative = (error - lastError) / (timeChange / 1000.0);
+        integral += error * (timeChange / 1000000.0);
+        derivative = (error - lastError) / (timeChange / 1000000.0);
+        derivative = 0.6 * lastDerivative + 0.4 * derivative; // Filtre simple
+        lastDerivative = derivative;
 
         // Calcul de la sortie MyPID
         *output = Kp * error + Ki * integral + Kd * derivative;

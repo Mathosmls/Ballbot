@@ -104,10 +104,10 @@ void IMU::printAll() {
     Serial.println();
 }
 void IMU::printAngle() {
-    Serial.print("Angles (rad) : pitch=");
-    Serial.print(degToRad(filtered_pitch));
+    Serial.print("Angles (deg) : pitch=");
+    Serial.print((filtered_pitch));
     Serial.print(" roll=");
-    Serial.println(degToRad(filtered_roll));
+    Serial.println((filtered_roll));
     Serial.println();
 }
 

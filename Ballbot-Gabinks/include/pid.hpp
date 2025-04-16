@@ -28,8 +28,9 @@ private:
     double lastError;       // Dernière erreur calculée
     double integral;        // Somme de l'intégrale
     unsigned long lastTime; // Dernier temps de calcul
-    unsigned long sampleTime; // Temps d'échantillonnage en ms
+    unsigned long sampleTime; // Temps d'échantillonnage en us
     double derivative; // Erreur dérivée
+    double lastDerivative;
 };
 
 #endif // MyPID_H
