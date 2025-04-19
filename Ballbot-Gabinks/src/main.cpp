@@ -25,14 +25,14 @@ IMU myIMU(500, 2);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 // double Kp_pitch = 137.0, Ki_pitch = 0.6, Kd_pitch =1.4;
-double Kp_pitch = 139.0, Ki_pitch = 0.5, Kd_pitch =1.4;
+double Kp_pitch = 100.0, Ki_pitch = 0., Kd_pitch =0.0;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
-double setpoint_pitch = radians(0.5); // Angle cible calculé par la boucle externe
-double setpoint_roll = radians(0.8);  // Angle cible calculé par la boucle externe
-double roll, pitch, vx, vy; // Entrée et sortie de la boucle interne
+double setpoint_pitch = radians(0.0); // Angle cible calculé par la boucle externe
+double setpoint_roll = radians(0.0);  // Angle cible calculé par la boucle externe
+double roll, pitch, vx, vy;           // Entrée et sortie de la boucle interne
 MyPID pid_pitch(Kp_pitch, Ki_pitch, Kd_pitch, &pitch, &vx, &setpoint_pitch);
 MyPID pid_roll(Kp_roll, Ki_roll, Kd_roll, &roll, &vy, &setpoint_roll);
-double offset_roll,offset_pitch;
+double offset_roll, offset_pitch;
 
 #pragma endregion
 
@@ -46,7 +46,7 @@ void cmd_rot_speeds(double (&cmd_rad)[3], double vx, double vy)
   {
     double angle = (1 - (i + 1)) * (2. / 3.) * M_PI + M_PI;
     double v_motor = -(vx * sin(angle) + vy * cos(angle));
-    cmd_rad[i] = constrain(v_motor, -10., 10.);
+    cmd_rad[i] = constrain(v_motor, -5., 5.);
   }
 }
 
@@ -54,7 +54,7 @@ void set_motors_speed(double (&cmd_rad)[3], int (&cmd_mot)[3], int maxi)
 {
   for (int i = 0; i < 3; i++)
   {
-    int cmd_step_mot = int(float(cmd_rad[i]) / (2. * M_PI) * 200. * 10.*4.); // rad/s->tr/s->tick/s->etage de reduction->microstep
+    int cmd_step_mot = int(float(cmd_rad[i]) / (2. * M_PI) * 200. * 10. * 4.); // rad/s->tr/s->tick/s->etage de reduction->microstep
     cmd_step_mot = constrain(cmd_step_mot, -maxi, maxi);
     cmd_mot[i] = cmd_step_mot;
   }
@@ -80,24 +80,23 @@ void print_cmd_motors(int cmd_mot[3])
   }
 }
 
-void send_cmd_mot(byte (&buf)[7],const int (&cmd_mot)[3])
+void send_cmd_mot(byte (&buf)[7], const int (&cmd_mot)[3])
 {
-  buf[0] = 0x01;  // Byte de démarrage
+  buf[0] = 0x01; // Byte de démarrage
 
   // Convertir chaque entier cmd_mot[i] en 2 octets (big endian)
-  buf[1] = (cmd_mot[0] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[0]
-  buf[2] = cmd_mot[0] & 0xFF;         // Octet de poids faible de cmd_mot[0]
+  buf[1] = (cmd_mot[0] >> 8) & 0xFF; // Octet de poids fort de cmd_mot[0]
+  buf[2] = cmd_mot[0] & 0xFF;        // Octet de poids faible de cmd_mot[0]
 
-  buf[3] = (cmd_mot[1] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[1]
-  buf[4] = cmd_mot[1] & 0xFF;         // Octet de poids faible de cmd_mot[1]
+  buf[3] = (cmd_mot[1] >> 8) & 0xFF; // Octet de poids fort de cmd_mot[1]
+  buf[4] = cmd_mot[1] & 0xFF;        // Octet de poids faible de cmd_mot[1]
 
-  buf[5] = (cmd_mot[2] >> 8) & 0xFF;  // Octet de poids fort de cmd_mot[2]
-  buf[6] = cmd_mot[2] & 0xFF;         // Octet de poids faible de cmd_mot[2]
+  buf[5] = (cmd_mot[2] >> 8) & 0xFF; // Octet de poids fort de cmd_mot[2]
+  buf[6] = cmd_mot[2] & 0xFF;        // Octet de poids faible de cmd_mot[2]
 
   // Envoyer le tableau buf avec les 7 octets
   Serial1.write(buf, sizeof(buf));
 }
-
 
 #pragma endregion
 
@@ -105,13 +104,18 @@ void send_cmd_mot(byte (&buf)[7],const int (&cmd_mot)[3])
 // Core program
 //----------------------------------------
 
-void computePID(double (&cmd_rad)[3], double &pitch_b, double &roll_b, int &i_b )
+void computePID(double (&cmd_rad)[3], double pitch_b, double roll_b, int &i_b)
 {
-  pitch = pitch_b/i_b-offset_pitch;
-  roll =roll_b/i_b-offset_roll;
-  i_b=0;
-  roll_b=0.;
-  pitch_b=0.;
+  pitch = pitch_b - offset_pitch;
+  roll = roll_b  - offset_roll;
+  if (abs(pitch)<radians(0.01))
+  {
+    pitch=0.0;
+  }
+  if (abs(roll)<radians(0.01))
+  {
+    roll=0.0;
+  }
   pid_pitch.Compute();
   pid_roll.Compute();
   cmd_rot_speeds(cmd_rad, vx, vy);
@@ -136,53 +140,51 @@ double cmd_speed_rad[3] = {4, 4, 4}; // vitesse visée pour chaque moteur
 int cmd_motors[3] = {0, 0, 0};       // vitesse visée pour chaque moteur
 
 unsigned long previousTime = 0;
-const unsigned long interval = 1./200.*1000000.0; // 5000 µs = 5 ms → 200 Hz
+const unsigned long interval = 1. / 200. * 1000000.0; // 5000 µs = 5 ms → 200 Hz
 byte buffer_cmd_mot[7];
-double roll_buff=0;
-double pitch_buff=0;
-int i_buff=0;
+double roll_buff = 0;
+double pitch_buff = 0;
+int i_buff = 0;
 void loop()
 {
   static unsigned long lastTime = 0;
 
-  unsigned long now = micros();
   myIMU.update_all();
-  
-  roll_buff+=myIMU.get_roll_rad();
-  pitch_buff+=myIMU.get_pitch_rad();
-  i_buff++;
+  unsigned long now = micros();
   if (now - lastTime >= interval)
   {
     lastTime = now;
 
     static int i = 0;
-    unsigned long t0 = micros();
+    // unsigned long t0 = micros();
 
-    
-    computePID(cmd_speed_rad,pitch_buff,roll_buff,i_buff);
-    set_motors_speed(cmd_speed_rad, cmd_motors, 12000);
-    // cmd_motors[0]=2000+i; 
-    // cmd_motors[1]=2000+i; 
-    // cmd_motors[2]=2000+i;  
-    send_cmd_mot(buffer_cmd_mot,cmd_motors);
+    computePID(cmd_speed_rad, myIMU.get_pitch_rad(), myIMU.get_roll_rad(), i_buff);
+    set_motors_speed(cmd_speed_rad, cmd_motors, 16000);
+    // cmd_motors[0]=2000+i;
+    // cmd_motors[1]=2000+i;
+    // cmd_motors[2]=2000+i;
+    send_cmd_mot(buffer_cmd_mot, cmd_motors);
 
-
-    if (i ==1)
+    if (i == 10)
     {
-      // print_cmd_speed(cmd_speed_rad);
-      // print_cmd_motors(cmd_motors);
+      print_cmd_speed(cmd_speed_rad);
+      print_cmd_motors(cmd_motors);
       // myIMU.printAngle();
+      // unsigned long now = micros();
       Serial.print(">roll:");
-      Serial.println(myIMU.get_roll_deg());
+      Serial.println(degrees(roll));
       Serial.print(">pitch:");
-      Serial.println(myIMU.get_pitch_deg());
+      Serial.println(degrees(pitch));
+      // unsigned long t1 = micros();
+      // Serial.print("IMU update took: ");
+      // Serial.println(t1 - now);
+      // Serial.println(" us");
       // Serial.println(interval);
 
       // Serial.print(">roll_kalman:");
       // Serial.println(myIMU.get_kalman_roll_deg());
       // Serial.print(">pitch_kalman:");
       // Serial.println(myIMU.get_kalman_pitch_deg());
-
 
       // Serial.print(">roll_madgwick:");
       // Serial.println(myIMU.get_madgwick_roll_deg());
@@ -195,7 +197,7 @@ void loop()
       // Serial.println(myIMU.accelData.accelY);
       // Serial.print(">accZ:");
       // Serial.println(myIMU.accelData.accelZ);
-  
+
       // Serial.print(">gyroX:");
       // Serial.println(myIMU.gyroData.gyroX);
       // Serial.print(">gyroY:");
@@ -209,9 +211,9 @@ void loop()
     {
       i++;
     }
-    unsigned long t1 = micros();
-  Serial.print("IMU update took: ");
-  Serial.println(t1 - now);
-  Serial.println(" us");
+    //   unsigned long t1 = micros();
+    // Serial.print("IMU update took: ");
+    // Serial.println(t1 - now);
+    // Serial.println(" us");
   }
 }

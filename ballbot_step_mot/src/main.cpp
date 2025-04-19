@@ -9,9 +9,9 @@ FastAccelStepper* steppers[3] = {NULL, NULL, NULL};
 byte buffer[7];
 
 
-long Acc_ref = 64000;
-int cmd_motors[3] = {2000, 1000, 500};
-int prev_cmd_motors[3] = {2000, 1000, 500};
+long Acc_ref = 85000;
+int cmd_motors[3] = {0, 0, 0};
+int prev_cmd_motors[3] = {0, 0, 0};
 long acc_motors[3] = {Acc_ref, Acc_ref, Acc_ref};
 
 template <typename T> int sgn(T val) {
@@ -45,7 +45,6 @@ void updateStepper(FastAccelStepper* &stepper, int speed_hz, long acceleration, 
     }
     else{
     stepper->setSpeedInHz(abs(speed_hz));
-    stepper->applySpeedAcceleration();
     }
   }
   prev_speed_hz=speed_hz;
