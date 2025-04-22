@@ -1,5 +1,16 @@
 #include "imu.hpp"
 
+float normalizeAngle(float angle) {
+    // Normalisation de l'angle entre -pi et pi
+    angle = fmod(angle, 2 * M_PI);  // Ramène l'angle dans l'intervalle [-2pi, 2pi]
+    if (angle > M_PI) {
+        angle -= 2 * M_PI;  // Si l'angle est supérieur à pi, le ramener dans l'intervalle [-pi, pi]
+    } else if (angle < -M_PI) {
+        angle += 2 * M_PI;  // Si l'angle est inférieur à -pi, le ramener dans l'intervalle [-pi, pi]
+    }
+    return angle;
+}
+
 // Constructeur
 IMU::IMU(int gyro_range, int acc_range) : _gyro_range(gyro_range),  _acc_range(acc_range){
     memset(&calibrationData, 0, sizeof(calData));
@@ -129,6 +140,8 @@ unsigned long currentTime = millis(); // Temps actuel
     // 4. Application du filtre complémentaire
     filtered_pitch = alpha * (filtered_pitch + gyroData.gyroY * dt) + (1 - alpha) * angleAccY;
     filtered_roll = alpha * (filtered_roll + gyroData.gyroX * dt) + (1 - alpha) * angleAccX;
+    normalizeAngle(filtered_pitch);
+    normalizeAngle(filtered_roll);
   }
 }
 
