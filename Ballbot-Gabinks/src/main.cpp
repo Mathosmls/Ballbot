@@ -25,10 +25,10 @@ IMU myIMU(500, 2);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 // double Kp_pitch = 137.0, Ki_pitch = 0.6, Kd_pitch =1.4;
-double Kp_pitch = 70.0, Ki_pitch = 10.0, Kd_pitch =0.0;
+double Kp_pitch = 97.0, Ki_pitch = 5., Kd_pitch =2.5;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
 double setpoint_pitch = radians(0.0); // Angle cible calculé par la boucle externe
-double setpoint_roll = radians(0.0);  // Angle cible calculé par la boucle externe
+double setpoint_roll = radians(0.);  // Angle cible calculé par la boucle externe
 double roll, pitch, vx, vy;           // Entrée et sortie de la boucle interne
 MyPID pid_pitch(Kp_pitch, Ki_pitch, Kd_pitch, &pitch, &vx, &setpoint_pitch);
 MyPID pid_roll(Kp_roll, Ki_roll, Kd_roll, &roll, &vy, &setpoint_roll);
@@ -159,7 +159,7 @@ void loop()
     // unsigned long t0 = micros();
 
     computePID(cmd_speed_rad, myIMU.get_pitch_rad(), myIMU.get_roll_rad(), i_buff);
-    set_motors_speed(cmd_speed_rad, cmd_motors, 20000);
+    set_motors_speed(cmd_speed_rad, cmd_motors, 16000);
     // cmd_motors[0]=2000+i;
     // cmd_motors[1]=2000+i;
     // cmd_motors[2]=2000+i;
