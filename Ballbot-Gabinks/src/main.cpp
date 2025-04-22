@@ -19,7 +19,7 @@ IMU myIMU(500, 2);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 
-double Kp_pitch = 5, Ki_pitch = 0.0, Kd_pitch = 0.01;
+double Kp_pitch =2800, Ki_pitch = 0.0, Kd_pitch = 0.01;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
 double setpoint_pitch = 0.;        // Angle cible calculé par la boucle externe
 double setpoint_roll = 0.;        // Angle cible calculé par la boucle externe
@@ -156,7 +156,7 @@ void loop() {
 
         for (int i=0;i<3;i++)
         {
-          double cmd=(prev_cmd_motors[i]+setpoints[i]);
+          double cmd=(setpoints[i]);
           cmd= clamp(cmd, -255., 255.);
           // Serial.println(cmd);
           motors[i].setSpeed(cmd);
