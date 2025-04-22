@@ -30,6 +30,7 @@ private:
     unsigned long lastTime; // Dernier temps de calcul
     unsigned long sampleTime; // Temps d'échantillonnage en ms
     double derivative; // Erreur dérivée
+    double lastDerivative;
 };
 
 #endif // MyPID_H
