@@ -36,8 +36,8 @@ double alpha_max = pi/60, alpha_dot_max = 1.; // alpha_max (rad), alpha_dot_max(
 float lambda = 0.5; // Permet de prendre plus ou moins en compte la vitesse de rotation / l'angle (lambda est compris entre 0 et 1)
 
 void fuzzy() {
-    double newKp_pitch = Kp_max*(1./2.)*(lambda*(pitch/alpha_max) + (1 - lambda)*(pid_pitch.Get_derivative() + alpha_dot_max)/(2*alpha_dot_max)); // Mériterait d'être autre chose que linéaire
-    double newKp_roll = Kp_max*(1./2.)*(lambda*(roll/alpha_max) + (1 - lambda)*(pid_roll.Get_derivative() + alpha_dot_max)/(2*alpha_dot_max)); // Mériterait d'être autre chose que linéaire
+    double newKp_pitch = Kp_max*(1./2.)*(lambda*(abs(pitch)/alpha_max) + (1 - lambda)*(abs(pid_pitch.Get_derivative()) + alpha_dot_max)/(2*alpha_dot_max)); // Mériterait d'être autre chose que linéaire
+    double newKp_roll = Kp_max*(1./2.)*(lambda*(abs(roll)/alpha_max) + (1 - lambda)*(abs(pid_roll.Get_derivative()) + alpha_dot_max)/(2*alpha_dot_max)); // Mériterait d'être autre chose que linéaire
     pid_pitch.SetKp(constrain(newKp_pitch, Kp_min, Kp_max));
     pid_roll.SetKp(constrain(newKp_roll, Kp_min, Kp_max));
 }
@@ -97,7 +97,7 @@ CytronMD motor3(PWM_DIR, 8, 9); // PWM 3 = Pin 7, DIR 3 = Pin 11.
 vector<CytronMD> motors = {motor1,motor2,motor3};
 
 vector<double> motors_cmd = {0., 0., 0.};
-vector<double> motors_setpoints = {12.5, 6.25, 3.125};
+vector<double> motors_setpoints = {0., 0., 0.};
 vector<double> motors_prev_cmd = {0., 0., 0.};
 vector<double> motors_speed = {0., 0., 0.};
 vector<double> last_pos_motors = {0., 0., 0.};
@@ -157,11 +157,11 @@ void print_data() {
 
     Serial.println("Corrections odomètres : ");
     Serial.print("c1 = ");
-    Serial.println(correction_odo1);
+    Serial.println(motors_cmd[0]);
     Serial.print("c2 = ");
-    Serial.println(correction_odo2);
+    Serial.println(motors_cmd[1]);
     Serial.print("c3 = ");
-    Serial.println(correction_odo3);
+    Serial.println(motors_cmd[2]);
     Serial.println("==================================================");
 }
 
@@ -211,7 +211,7 @@ void computePID(vector<double> &set) {
   roll = myIMU.get_roll_rad();
   pid_pitch.Compute();
   pid_roll.Compute();
-  // set_motors_setpoints(set, vx, vy);
+  set_motors_setpoints(set, vx, vy);
 }
 
 void set_speed_motors(vector<MyPID> pids_wheels) {
@@ -247,7 +247,7 @@ void loop() {
 
     myIMU.update();
     updateEncoders();
-    // fuzzy();
+    fuzzy();
     computePID(motors_setpoints);
 
     currentTime = millis();
