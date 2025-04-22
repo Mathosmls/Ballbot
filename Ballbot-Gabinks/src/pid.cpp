@@ -56,7 +56,7 @@ void MyPID::Compute() {
         // Calcul de l'intégrale et de la dérivée
         integral += error * (timeChange / 1000000.0);
         derivative = (error - lastError) / (timeChange / 1000000.0);
-        derivative = 0.6 * lastDerivative + 0.4 * derivative; // Filtre simple
+        // derivative = 0.6 * lastDerivative + 0.4 * derivative; // Filtre simple
         lastDerivative = derivative;
 
         // Calcul de la sortie MyPID

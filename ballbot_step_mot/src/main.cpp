@@ -9,7 +9,7 @@ FastAccelStepper* steppers[3] = {NULL, NULL, NULL};
 byte buffer[7];
 
 
-long Acc_ref = 85000;
+long Acc_ref = 61000;
 int cmd_motors[3] = {0, 0, 0};
 int prev_cmd_motors[3] = {0, 0, 0};
 long acc_motors[3] = {Acc_ref, Acc_ref, Acc_ref};
