@@ -40,22 +40,25 @@ private:
     float P_pitch[2][2] = {{1, 0}, {0, 1}};
     float P_roll[2][2] = {{1, 0}, {0, 1}};
 
-    float Q_angle = 0.02;  // Bruit de processus (angle)
+    float Q_angle = 0.001;  // Bruit de processus (angle)
     float Q_bias = 0.003;   // Bruit de processus (biais gyroscope)
-    float R_measure = 0.003; // Bruit de mesure (accéléro)
+    float R_measure = 0.08; // Bruit de mesure (accéléro)
 
     float q[4] = {1.0f, 0.0f, 0.0f, 0.0f}; // Quaternion [w, x, y, z]
-    float beta = 0.75f; // Gain du filtre Madgwick
-    float zeta = 1.f; // Optionnel : gain pour compensation du biais gyroscopique
+    float beta = 1.0f; // Gain du filtre Madgwick
+    float zeta = 0.1f; // Optionnel : gain pour compensation du biais gyroscopique
     float madgwick_pitch = 0.0f;
     float madgwick_roll = 0.0f;
-
+    const float smoothing_factor = 1.0;
+  
     void apply_offset();
 
 public:
     IMU(int gyro_range, int acc_range); // Constructeur
     AccelData accelData;     // Données de l'accéléromètre
     GyroData gyroData;       // Données du gyroscope
+    AccelData filtered_accel;
+
     // Méthodes publiques
     bool init();      // Initialise l'IMU
     void calibrate(); // Calibre l'IMU

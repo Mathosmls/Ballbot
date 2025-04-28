@@ -17,7 +17,7 @@ T clamp(T val, T min_val, T max_val)
 
 #pragma region "IMU"
 
-IMU myIMU(500, 2);
+IMU myIMU(500, 4);
 
 #pragma endregion
 
@@ -25,7 +25,7 @@ IMU myIMU(500, 2);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 // double Kp_pitch = 137.0, Ki_pitch = 0.6, Kd_pitch =1.4;
-double Kp_pitch = 97.0, Ki_pitch = 5., Kd_pitch =2.5;
+double Kp_pitch = 90.0, Ki_pitch = 0., Kd_pitch =0.;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
 double setpoint_pitch = radians(0.0); // Angle cible calculé par la boucle externe
 double setpoint_roll = radians(0.);  // Angle cible calculé par la boucle externe
@@ -181,29 +181,29 @@ void loop()
       // Serial.println(" us");
       // Serial.println(interval);
 
-      // Serial.print(">roll_kalman:");
-      // Serial.println(myIMU.get_kalman_roll_deg());
-      // Serial.print(">pitch_kalman:");
-      // Serial.println(myIMU.get_kalman_pitch_deg());
+      Serial.print(">roll_kalman:");
+      Serial.println(myIMU.get_kalman_roll_deg());
+      Serial.print(">pitch_kalman:");
+      Serial.println(myIMU.get_kalman_pitch_deg());
 
       // Serial.print(">roll_madgwick:");
       // Serial.println(myIMU.get_madgwick_roll_deg());
       // Serial.print(">pitch_madgwick:");
       // Serial.println(myIMU.get_madgwick_pitch_deg());
 
-      // Serial.print(">accX:");
-      // Serial.println(myIMU.accelData.accelX);
-      // Serial.print(">accY:");
-      // Serial.println(myIMU.accelData.accelY);
-      // Serial.print(">accZ:");
-      // Serial.println(myIMU.accelData.accelZ);
+      Serial.print(">accX:");
+      Serial.println(myIMU.filtered_accel.accelX);
+      Serial.print(">accY:");
+      Serial.println(myIMU.filtered_accel.accelY);
+      Serial.print(">accZ:");
+      Serial.println(myIMU.filtered_accel.accelZ);
 
-      // Serial.print(">gyroX:");
-      // Serial.println(myIMU.gyroData.gyroX);
-      // Serial.print(">gyroY:");
-      // Serial.println(myIMU.gyroData.gyroY);
-      // Serial.print(">gyroZ:");
-      // Serial.println(myIMU.gyroData.gyroZ);
+      Serial.print(">gyroX:");
+      Serial.println(myIMU.gyroData.gyroX);
+      Serial.print(">gyroY:");
+      Serial.println(myIMU.gyroData.gyroY);
+      Serial.print(">gyroZ:");
+      Serial.println(myIMU.gyroData.gyroZ);
 
       i = 0;
     }

@@ -92,7 +92,7 @@ void IMU::calibrate()
     {
         update_all();
     }
-    max_mes=100;
+    max_mes = 100;
     Serial.println("Mesure des offsets...");
     for (int j = 0; j < max_mes; j++)
     {
@@ -106,9 +106,9 @@ void IMU::calibrate()
 }
 void IMU::apply_offset()
 {
-    accelData.accelX -= bias_accelData.accelX;
-    accelData.accelY -= bias_accelData.accelY;
-    accelData.accelZ -= bias_accelData.accelZ;
+    filtered_accel.accelX -= bias_accelData.accelX;
+    filtered_accel.accelY -= bias_accelData.accelY;
+    filtered_accel.accelZ -= bias_accelData.accelZ;
 
     gyroData.gyroX -= bias_gyroData.gyroX;
     gyroData.gyroY -= bias_gyroData.gyroY;
@@ -119,10 +119,14 @@ void IMU::update_all()
 {
     imu.update();
     imu.getAccel(&accelData);
+
+    filtered_accel.accelX = smoothing_factor * accelData.accelX + (1 - smoothing_factor) * filtered_accel.accelX;
+    filtered_accel.accelY = smoothing_factor * accelData.accelY + (1 - smoothing_factor) * filtered_accel.accelY;
+    filtered_accel.accelZ = smoothing_factor * accelData.accelZ + (1 - smoothing_factor) * filtered_accel.accelZ;
     imu.getGyro(&gyroData);
     apply_offset();
     complementary_filter();
-    // kalman_filter(); // ← nouveau
+    kalman_filter(); // ← nouveau
     // madgwick_filter();
 }
 
@@ -171,23 +175,39 @@ GyroData IMU::get_gyro() const
 void IMU::complementary_filter()
 {
 
-    unsigned long currentTime = millis(); // Temps actuel
-    if (currentTime - lastUpdateTime >= dt * 1000)
+    unsigned long currentTime = millis();                    // Temps actuel
+                                                             // if (currentTime - lastUpdateTime >= dt * 1000)
+                                                             // {
+    double real_dt = (currentTime - lastUpdateTime) / 1000.; // Vérifie si dt (en ms) est écoulé
+    lastUpdateTime = currentTime;                            // Met à jour le dernier temps de cycle
+
+    // 2. Calcul des angles via l'accéléromètre
+    auto angleAccX = atan2(filtered_accel.accelY, filtered_accel.accelZ) * 180 / PI;  // Tangage (pitch)
+    auto angleAccY = atan2(-filtered_accel.accelX, filtered_accel.accelZ) * 180 / PI; // Roulis (roll)
+    // Note : angleAccZ est inutile ici pour le lacet (yaw).
+    float acc_norm = sqrt(filtered_accel.accelX * filtered_accel.accelX + filtered_accel.accelY * filtered_accel.accelY + filtered_accel.accelZ * filtered_accel.accelZ);
+    int val = 0;
+    if (acc_norm > 0.97 && acc_norm < 1.03)
     {
-        double real_dt = (currentTime - lastUpdateTime) / 1000.; // Vérifie si dt (en ms) est écoulé
-        lastUpdateTime = currentTime;                            // Met à jour le dernier temps de cycle
-
-        // 2. Calcul des angles via l'accéléromètre
-        auto angleAccX = atan2(accelData.accelY, accelData.accelZ) * 180 / PI;  // Tangage (pitch)
-        auto angleAccY = atan2(-accelData.accelX, accelData.accelZ) * 180 / PI; // Roulis (roll)
-        // Note : angleAccZ est inutile ici pour le lacet (yaw).
-
-        // 4. Application du filtre complémentaire
-        filtered_pitch = alpha * (filtered_pitch + gyroData.gyroY * real_dt) + (1 - alpha) * angleAccY-bias_pitch_rad;
-        filtered_roll = alpha * (filtered_roll + gyroData.gyroX * real_dt) + (1 - alpha) * angleAccX-bias_roll_rad;
-        normalizeAngle(filtered_pitch);
-        normalizeAngle(filtered_roll);
+        // Normal case, appliquer filtre complémentaire
+        filtered_pitch = alpha * (filtered_pitch + gyroData.gyroY * real_dt) + (1 - alpha) * angleAccY - bias_pitch_rad;
+        filtered_roll = alpha * (filtered_roll + gyroData.gyroX * real_dt) + (1 - alpha) * angleAccX - bias_roll_rad;
+        val = 0;
     }
+    else
+    {
+        val = 1;
+        // Acc anormal → ignorer sa contribution
+        filtered_pitch = (filtered_pitch + gyroData.gyroY * real_dt);
+        filtered_roll = (filtered_roll + gyroData.gyroX * real_dt);
+    }
+    Serial.print(">Acc ignored:");
+    Serial.println(val);
+    // 4. Application du filtre complémentaire
+
+    normalizeAngle(filtered_pitch);
+    normalizeAngle(filtered_roll);
+    // }
 }
 
 double IMU::get_pitch_deg() const
@@ -228,28 +248,37 @@ double IMU::degToRad(double degrees) const
 
     return radians;
 }
-
 void IMU::kalman_filter()
 {
-    unsigned long currentTime = millis(); // Temps actuel
-    if (currentTime - lastUpdateTime_kalman >= dt * 1000)
-    { // Vérifie si dt (en ms) est écoulé
-        double real_dt = (currentTime - lastUpdateTime) / 1000.;
-        lastUpdateTime_kalman = currentTime;
-        float angleAccPitch = atan2(-accelData.accelX, accelData.accelZ) * 180 / PI;
-        float angleAccRoll = atan2(accelData.accelY, accelData.accelZ) * 180 / PI;
+    static float acc_norm_smoothed = 1.0;
+    const float acc_norm_alpha = 0.9; // Pour lisser la norme de l'acc
+    unsigned long currentTime = millis();
+    double real_dt = (currentTime - lastUpdateTime_kalman) / 1000.0;
+    lastUpdateTime_kalman = currentTime;
 
-        // === PITCH ===
-        // 1. Prediction
-        float rate_pitch = gyroData.gyroY - kalman_bias_pitch;
-        kalman_pitch += real_dt * rate_pitch;
+    float angleAccPitch = atan2(-filtered_accel.accelX, filtered_accel.accelZ) * 180.0 / PI;
+    float angleAccRoll = atan2(filtered_accel.accelY, filtered_accel.accelZ) * 180.0 / PI;
 
-        P_pitch[0][0] += real_dt * (real_dt * P_pitch[1][1] - P_pitch[1][0] - P_pitch[0][1] + Q_angle);
-        P_pitch[0][1] -= real_dt * P_pitch[1][1];
-        P_pitch[1][0] -= real_dt * P_pitch[1][1];
-        P_pitch[1][1] += Q_bias * real_dt;
+    // --- Vérif accéléromètre ---
+    float acc_norm = sqrt(
+        filtered_accel.accelX * filtered_accel.accelX +
+        filtered_accel.accelY * filtered_accel.accelY +
+        filtered_accel.accelZ * filtered_accel.accelZ);
+    
+    // Lissage pour éviter des sauts dû au bruit
+    acc_norm_smoothed = acc_norm_alpha * acc_norm_smoothed + (1.0 - acc_norm_alpha) * acc_norm;
+    bool acc_valid = acc_norm_smoothed > 0.95 && acc_norm_smoothed < 1.05;
 
-        // 2. Update
+    // === PITCH ===
+    float rate_pitch = gyroData.gyroY - kalman_bias_pitch;
+    kalman_pitch += real_dt * rate_pitch;
+
+    P_pitch[0][0] += real_dt * (real_dt * P_pitch[1][1] - P_pitch[1][0] - P_pitch[0][1] + Q_angle);
+    P_pitch[0][1] -= real_dt * P_pitch[1][1];
+    P_pitch[1][0] -= real_dt * P_pitch[1][1];
+    P_pitch[1][1] += Q_bias * real_dt;
+
+    if (acc_valid) {
         float y_pitch = angleAccPitch - kalman_pitch;
         float S_pitch = P_pitch[0][0] + R_measure;
         float K_pitch[2];
@@ -260,21 +289,22 @@ void IMU::kalman_filter()
         kalman_bias_pitch += K_pitch[1] * y_pitch;
 
         float P00_temp = P_pitch[0][0], P01_temp = P_pitch[0][1];
-
         P_pitch[0][0] -= K_pitch[0] * P00_temp;
         P_pitch[0][1] -= K_pitch[0] * P01_temp;
         P_pitch[1][0] -= K_pitch[1] * P00_temp;
         P_pitch[1][1] -= K_pitch[1] * P01_temp;
+    }
 
-        // === ROLL ===
-        float rate_roll = gyroData.gyroX - kalman_bias_roll;
-        kalman_roll += real_dt * rate_roll;
+    // === ROLL ===
+    float rate_roll = gyroData.gyroX - kalman_bias_roll;
+    kalman_roll += real_dt * rate_roll;
 
-        P_roll[0][0] += real_dt * (real_dt * P_roll[1][1] - P_roll[1][0] - P_roll[0][1] + Q_angle);
-        P_roll[0][1] -= real_dt * P_roll[1][1];
-        P_roll[1][0] -= real_dt * P_roll[1][1];
-        P_roll[1][1] += Q_bias * real_dt;
+    P_roll[0][0] += real_dt * (real_dt * P_roll[1][1] - P_roll[1][0] - P_roll[0][1] + Q_angle);
+    P_roll[0][1] -= real_dt * P_roll[1][1];
+    P_roll[1][0] -= real_dt * P_roll[1][1];
+    P_roll[1][1] += Q_bias * real_dt;
 
+    if (acc_valid) {
         float y_roll = angleAccRoll - kalman_roll;
         float S_roll = P_roll[0][0] + R_measure;
         float K_roll[2];
@@ -285,13 +315,13 @@ void IMU::kalman_filter()
         kalman_bias_roll += K_roll[1] * y_roll;
 
         float P00_temp_r = P_roll[0][0], P01_temp_r = P_roll[0][1];
-
         P_roll[0][0] -= K_roll[0] * P00_temp_r;
         P_roll[0][1] -= K_roll[0] * P01_temp_r;
         P_roll[1][0] -= K_roll[1] * P00_temp_r;
         P_roll[1][1] -= K_roll[1] * P01_temp_r;
     }
 }
+
 
 double IMU::get_kalman_pitch_deg() const
 {
