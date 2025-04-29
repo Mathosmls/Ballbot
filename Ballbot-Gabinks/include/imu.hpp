@@ -28,7 +28,8 @@ private:
     double filtered_roll;
     // float alpha = 0.98;
     // float alpha = 0.989;
-    float alpha = 0.992;
+    //float alpha=0.975
+    float alpha = 0.97;
 
 
     // Kalman pour pitch et roll

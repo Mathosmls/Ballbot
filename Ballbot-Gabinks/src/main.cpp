@@ -25,7 +25,10 @@ IMU myIMU(500, 4);
 
 #pragma region "PID de contrôle de l'angle (boucle externe)"
 // double Kp_pitch = 137.0, Ki_pitch = 0.6, Kd_pitch =1.4;
-double Kp_pitch = 90.0, Ki_pitch = 0., Kd_pitch =0.;
+//double Kp_pitch = 36.0, Ki_pitch = 1., Kd_pitch =1.2;
+// double Kp_pitch = 29.0, Ki_pitch = 1., Kd_pitch =1.3; //alpha=0.975
+
+double Kp_pitch = 31, Ki_pitch = 1., Kd_pitch =1.3;
 double Kp_roll = Kp_pitch, Ki_roll = Ki_pitch, Kd_roll = Kd_pitch;
 double setpoint_pitch = radians(0.0); // Angle cible calculé par la boucle externe
 double setpoint_roll = radians(0.);  // Angle cible calculé par la boucle externe
@@ -140,7 +143,7 @@ double cmd_speed_rad[3] = {4, 4, 4}; // vitesse visée pour chaque moteur
 int cmd_motors[3] = {0, 0, 0};       // vitesse visée pour chaque moteur
 
 unsigned long previousTime = 0;
-const unsigned long interval = 1. / 250. * 1000000.0; // 5000 µs = 5 ms → 200 Hz
+const unsigned long interval = 1. / 200. * 1000000.0; // 5000 µs = 5 ms → 200 Hz
 byte buffer_cmd_mot[7];
 double roll_buff = 0;
 double pitch_buff = 0;
@@ -160,9 +163,9 @@ void loop()
 
     computePID(cmd_speed_rad, myIMU.get_pitch_rad(), myIMU.get_roll_rad(), i_buff);
     set_motors_speed(cmd_speed_rad, cmd_motors, 16000);
-    // cmd_motors[0]=2000+i;
-    // cmd_motors[1]=2000+i;
-    // cmd_motors[2]=2000+i;
+    // cmd_motors[0]=15000;
+    // cmd_motors[1]=15000;
+    // cmd_motors[2]=15000;
     send_cmd_mot(buffer_cmd_mot, cmd_motors);
 
     if (i == 10)
